@@ -106,25 +106,19 @@
                     <h3 class="text-sm font-semibold text-gray-700 mb-3 border-b pb-1">ข้อมูลลูกค้า และ บริษัท</h3>
                     <div class="space-y-3">
                         
-                        <!-- ชื่อลูกค้า / บุคคล -->
+                        <!-- รายชื่อลูกค้า (หลายคนได้) -->
                         <div>
-                            <label class="block text-xs font-medium text-gray-700">ชื่อลูกค้า / Customer Name</label>
-                            <div class="grid grid-cols-2 gap-3 mt-1">
-                                <input type="text" id="input-en-name" class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 border text-sm" placeholder="EN Name (e.g. PENG LEI)">
-                                <input type="text" id="input-cn-name" class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 border text-sm" placeholder="CN Name (e.g. 彭 磊)">
+                            <div class="flex items-center justify-between">
+                                <label class="block text-xs font-medium text-gray-700">ลูกค้า / Customer (สูงสุด 5 คน)</label>
+                                <button type="button" id="btn-add-customer" class="text-xs font-semibold text-blue-700 hover:text-blue-900 border border-blue-300 rounded px-2 py-0.5 bg-white">+ เพิ่มลูกค้า</button>
                             </div>
+                            <div id="customer-list" class="mt-2 space-y-2"></div>
                         </div>
 
-                        <!-- พาสปอร์ต และ เลขเสียภาษี -->
-                        <div class="grid grid-cols-2 gap-3">
-                            <div>
-                                <label class="block text-xs font-medium text-gray-700">เลขพาสปอร์ต / Passport</label>
-                                <input type="text" id="input-passport" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 border text-sm" placeholder="EP6124171">
-                            </div>
-                            <div>
-                                <label class="block text-xs font-medium text-gray-700">เลขผู้เสียภาษี / Tax ID</label>
-                                <input type="text" id="input-tax-id" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 border text-sm" placeholder="01055xxxxxxxx">
-                            </div>
+                        <!-- เลขเสียภาษี -->
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700">เลขผู้เสียภาษี / Tax ID</label>
+                            <input type="text" id="input-tax-id" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 border text-sm" placeholder="01055xxxxxxxx">
                         </div>
 
                         <!-- ชื่อบริษัท และ ที่อยู่ -->
@@ -223,7 +217,7 @@
                     <div class="col-span-8 space-y-2">
                         <p class="text-sm font-bold text-gray-800 mb-2 border-b-2 border-gray-200 pb-1 w-fit">ข้อมูลลูกค้า (CUSTOMER / 顾客)</p>
                         
-                        <div class="grid grid-cols-[140px_1fr] items-baseline gap-2">
+                        <div id="row-single-name" class="grid grid-cols-[140px_1fr] items-baseline gap-2">
                             <span class="text-sm text-gray-600">ชื่อ (NAME) 姓名:</span>
                             <div class="text-md font-semibold text-gray-900 border-b border-dashed border-gray-400 pb-0.5 leading-snug min-h-[1.5rem]">
                                 <span id="view-en-name"></span>
@@ -251,7 +245,7 @@
                             <div class="text-md font-bold text-gray-900 border-b border-dashed border-gray-400 pb-0.5 mt-1 text-right" id="view-date"></div>
                         </div>
 
-                        <div class="flex flex-col mb-3">
+                        <div id="row-single-passport" class="flex flex-col mb-3">
                             <span class="text-sm text-gray-600">เลขพาสปอร์ต (PASSPORT):</span>
                             <div class="text-md font-semibold text-gray-900 border-b border-dashed border-gray-400 pb-0.5 mt-1 text-right" id="view-passport"></div>
                         </div>
@@ -261,6 +255,21 @@
                             <div class="text-md font-semibold text-gray-900 border-b border-dashed border-gray-400 pb-0.5 mt-1 text-right" id="view-tax-id"></div>
                         </div>
                     </div>
+                </div>
+
+                <!-- Customer list (shown only when more than one customer) -->
+                <div id="customer-table-block" class="hidden mb-6">
+                    <p class="text-sm font-bold text-gray-800 mb-2 border-b-2 border-gray-200 pb-1 w-fit">รายชื่อลูกค้า (CUSTOMER LIST / 顾客名单) — <span id="view-customer-count"></span></p>
+                    <table class="w-full border-collapse border border-gray-300 text-sm">
+                        <thead>
+                            <tr class="bg-gray-50">
+                                <th class="border border-gray-300 px-3 py-1.5 text-center w-10 text-gray-600 font-semibold">#</th>
+                                <th class="border border-gray-300 px-3 py-1.5 text-left text-gray-600 font-semibold">ชื่อ (NAME) 姓名</th>
+                                <th class="border border-gray-300 px-3 py-1.5 text-left w-56 text-gray-600 font-semibold">เลขพาสปอร์ต (PASSPORT NO) 护照号</th>
+                            </tr>
+                        </thead>
+                        <tbody id="customer-table-body"></tbody>
+                    </table>
                 </div>
 
                 <!-- Table Header -->
@@ -403,6 +412,48 @@
             window.print();
         }
 
+        // ===== Customer list (1–5 people) =====
+        const MAX_CUSTOMERS = 5;
+        function customerRowHtml(idx) {
+            return `
+                <div class="customer-row grid grid-cols-[1fr_1fr_1fr_auto] gap-1.5 items-center" data-idx="${idx}">
+                    <input type="text" class="cust-en block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-1.5 border text-sm" placeholder="EN Name">
+                    <input type="text" class="cust-cn block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-1.5 border text-sm" placeholder="中文名">
+                    <input type="text" class="cust-pp block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-1.5 border text-sm font-mono" placeholder="Passport">
+                    <button type="button" class="cust-del text-gray-400 hover:text-red-600 px-1 text-lg leading-none" title="ลบ">×</button>
+                </div>`;
+        }
+        function addCustomerRow(focus = true) {
+            const list = document.getElementById('customer-list');
+            if (list.children.length >= MAX_CUSTOMERS) return;
+            list.insertAdjacentHTML('beforeend', customerRowHtml(list.children.length));
+            const row = list.lastElementChild;
+            row.querySelectorAll('input').forEach(i => i.addEventListener('input', updateBill));
+            row.querySelector('.cust-del').addEventListener('click', () => {
+                if (list.children.length === 1) { row.querySelectorAll('input').forEach(i => i.value = ''); }
+                else row.remove();
+                refreshCustomerButtons(); updateBill();
+            });
+            refreshCustomerButtons();
+            if (focus) row.querySelector('.cust-en').focus();
+        }
+        function refreshCustomerButtons() {
+            const list = document.getElementById('customer-list');
+            const btn = document.getElementById('btn-add-customer');
+            btn.disabled = list.children.length >= MAX_CUSTOMERS;
+            btn.classList.toggle('opacity-40', btn.disabled);
+        }
+        function getCustomers() {
+            return [...document.querySelectorAll('#customer-list .customer-row')].map(r => ({
+                en: r.querySelector('.cust-en').value.trim(),
+                cn: r.querySelector('.cust-cn').value.trim(),
+                pp: r.querySelector('.cust-pp').value.trim()
+            })).filter(c => c.en || c.cn || c.pp);
+        }
+        const esc = (t) => String(t).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+        const nameHtml = (c) => `<span class="font-semibold">${esc(c.en)}</span>${c.cn ? ` <span class="text-gray-700">[${esc(c.cn)}]</span>` : ''}`;
+        const personsLabel = (n) => `${n} ท่าน (${n} person${n > 1 ? 's' : ''} / 共${n}人)`;
+
         // Helper to set view value with fallback for dotted lines
         function setViewValue(elementId, value) {
             const el = document.getElementById(elementId);
@@ -418,10 +469,12 @@
             const docType = document.getElementById('input-doc-type').value;
             const currencyType = document.getElementById('input-currency').value;
             const docNo = document.getElementById('input-doc-no').value;
-            const enName = document.getElementById('input-en-name').value;
-            const cnName = document.getElementById('input-cn-name').value;
+            const customers = getCustomers();
+            const single = customers.length <= 1 ? (customers[0] || {en:'',cn:'',pp:''}) : null;
+            const enName = single ? single.en : '';
+            const cnName = single ? single.cn : '';
+            const passport = single ? single.pp : '';
             const date = document.getElementById('input-date').value;
-            const passport = document.getElementById('input-passport').value;
             
             // New Company Fields
             const companyName = document.getElementById('input-company-name').value;
@@ -462,6 +515,22 @@
 
             setViewValue('view-date', formatDateLong(date));
             setViewValue('view-passport', passport);
+
+            // single vs multi customer layout
+            const isMulti = customers.length > 1;
+            document.getElementById('row-single-name').classList.toggle('hidden', isMulti);
+            document.getElementById('row-single-passport').classList.toggle('hidden', isMulti);
+            const ctBlock = document.getElementById('customer-table-block');
+            ctBlock.classList.toggle('hidden', !isMulti);
+            if (isMulti) {
+                document.getElementById('view-customer-count').innerText = personsLabel(customers.length);
+                document.getElementById('customer-table-body').innerHTML = customers.map((c, i) => `
+                    <tr>
+                        <td class="border border-gray-300 px-3 py-1.5 text-center text-gray-500">${i + 1}</td>
+                        <td class="border border-gray-300 px-3 py-1.5">${nameHtml(c)}</td>
+                        <td class="border border-gray-300 px-3 py-1.5 font-mono">${esc(c.pp)}</td>
+                    </tr>`).join('');
+            }
             
             // Set new fields (Removed the long manual spacer string)
             setViewValue('view-company-name', companyName);
@@ -477,11 +546,15 @@
 
             // Build client info summary for table row 1
             let clientInfoHtml = '';
-            if(enName || cnName) {
-                clientInfoHtml += `<p>ชื่อ (NAME) 姓名: <span class="font-semibold">${enName}</span> ${cnName ? `[<span class="font-semibold">${cnName}</span>]` : ''}</p>`;
-            }
-            if(passport) {
-                clientInfoHtml += `<p>เลขที่พาสปอร์ต (PASSPORT NO) 护照号: <span class="font-semibold">${passport}</span></p>`;
+            if (isMulti) {
+                clientInfoHtml += `<p>จำนวนลูกค้า: <span class="font-semibold">${personsLabel(customers.length)}</span> — ตามรายชื่อด้านบน (see customer list above / 见上方名单)</p>`;
+            } else {
+                if(enName || cnName) {
+                    clientInfoHtml += `<p>ชื่อ (NAME) 姓名: ${nameHtml(single)}</p>`;
+                }
+                if(passport) {
+                    clientInfoHtml += `<p>เลขที่พาสปอร์ต (PASSPORT NO) 护照号: <span class="font-semibold font-mono">${esc(passport)}</span></p>`;
+                }
             }
 
             // Item 1: Service
@@ -577,7 +650,6 @@
 
         const inputIds = [
             'input-doc-type', 'input-currency', 'input-doc-no', 'input-date',
-            'input-en-name', 'input-cn-name', 'input-passport',
             'input-company-name', 'input-company-address', 'input-tax-id', // New inputs added to listener
             'input-service-type', 'input-service-amount',
             'input-travel-type', 'input-travel-amount',
@@ -586,6 +658,7 @@
 
         document.getElementById('input-doc-type').addEventListener('change', generateDocNo);
         document.getElementById('input-date').addEventListener('change', generateDocNo);
+        document.getElementById('btn-add-customer').addEventListener('click', () => addCustomerRow(true));
         document.getElementById('btn-regen').addEventListener('click', () => { commitDocNo(); generateDocNo(); });
 
         inputIds.forEach(id => {
@@ -603,6 +676,7 @@
             // General Details
             document.getElementById('input-doc-type').value = "invoice";
             document.getElementById('input-currency').value = "THB";
+            addCustomerRow(false);
             document.getElementById('input-date').value = todayISO();
             generateDocNo();
 
