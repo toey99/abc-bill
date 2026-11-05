@@ -680,6 +680,32 @@
             document.getElementById('input-date').value = todayISO();
             generateDocNo();
 
+            // Prefill from the /today board: ?d=<base64url JSON>
+            //   { customers: [{en, cn, pp}], amount, service: 'service_2', currency: 'THB', docType: 'cash_sale' }
+            try {
+                const raw = new URLSearchParams(location.search).get('d');
+                if (raw) {
+                    const json = decodeURIComponent(escape(atob(raw.replace(/-/g, '+').replace(/_/g, '/'))));
+                    const d = JSON.parse(json);
+                    if (d.docType) document.getElementById('input-doc-type').value = d.docType;
+                    if (d.currency) document.getElementById('input-currency').value = d.currency;
+                    if (Array.isArray(d.customers) && d.customers.length) {
+                        const list = document.getElementById('customer-list');
+                        list.innerHTML = '';
+                        d.customers.slice(0, MAX_CUSTOMERS).forEach((c) => {
+                            addCustomerRow(false);
+                            const row = list.lastElementChild;
+                            row.querySelector('.cust-en').value = c.en || '';
+                            row.querySelector('.cust-cn').value = c.cn || '';
+                            row.querySelector('.cust-pp').value = c.pp || '';
+                        });
+                    }
+                    if (d.service) document.getElementById('input-service-type').value = d.service;
+                    if (d.amount) document.getElementById('input-service-amount').value = d.amount;
+                    generateDocNo();
+                }
+            } catch (e) { console.warn('prefill failed', e); }
+
             updateBill();
         };
     </script>
