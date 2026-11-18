@@ -177,6 +177,22 @@
                             <input type="number" id="input-other-amount" class="block w-full rounded-md border-gray-300 shadow-sm focus:border-yellow-500 focus:ring-yellow-500 p-1.5 border text-sm" placeholder="0">
                         </div>
                     </div>
+
+                    <!-- ออกบิล +3% (บวกกลับภาษีหัก ณ ที่จ่าย) -->
+                    <div class="rounded-lg border border-pink-200 bg-pink-50 p-3">
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" id="input-wht" class="h-4 w-4 rounded border-pink-300 text-pink-500">
+                            <span class="text-sm font-bold text-pink-700">ออกบิล +3% (หัก ณ ที่จ่าย 3%) 开票+3%</span>
+                        </label>
+                        <p class="text-[11px] text-pink-700/80 mt-1">กรอกราคาเป็น <b>ยอดรับจริง</b> ตามปกติ ระบบจะคำนวณยอดออกบิลให้เอง (ยอดรับจริง ÷ 0.97)</p>
+                        <div id="wht-options" class="hidden mt-2 space-y-2">
+                            <label class="flex items-center gap-2 cursor-pointer">
+                                <input type="checkbox" id="input-wht-show" checked class="h-4 w-4 rounded border-pink-300 text-pink-500">
+                                <span class="text-xs text-pink-800">แสดงบรรทัด "หัก ณ ที่จ่าย 3%" และ "ยอดชำระสุทธิ" บนบิล</span>
+                            </label>
+                            <p id="wht-hint" class="text-xs font-semibold text-pink-900 bg-white border border-pink-200 rounded px-2 py-1.5"></p>
+                        </div>
+                    </div>
                 </div>
 
             </div>
@@ -300,6 +316,21 @@
                             </td>
                         </tr>
                     </tbody>
+                    <!-- Withholding tax rows (only for +3% bills) -->
+                    <tbody id="wht-rows" class="hidden">
+                        <tr>
+                            <td colspan="2" class="border border-gray-400 px-4 py-2 text-sm">
+                                <span class="font-semibold">หัก ภาษี ณ ที่จ่าย 3% (Less Withholding Tax 3%) 代扣税 3%</span>
+                            </td>
+                            <td class="border border-gray-400 px-4 py-2 text-right font-semibold text-lg"><span id="view-wht-amount"></span></td>
+                        </tr>
+                        <tr class="bg-gray-50">
+                            <td colspan="2" class="border border-gray-400 px-4 py-2 text-sm">
+                                <span class="font-bold">ยอดชำระสุทธิ (Net Payment) 实付金额</span>
+                            </td>
+                            <td class="border border-gray-400 px-4 py-2 text-right font-bold text-lg"><span id="view-net-amount"></span></td>
+                        </tr>
+                    </tbody>
                 </table>
 
                 <!-- Footer Electronic Document Note (Style ABC) -->
@@ -348,32 +379,63 @@
         };
 
         // Number to Text Helper Functions
+        function thaiIntText(n) {
+            const thaiNumbers = ["ศูนย์", "หนึ่ง", "สอง", "สาม", "สี่", "ห้า", "หก", "เจ็ด", "แปด", "เก้า"];
+            const thaiUnits = ["", "สิบ", "ร้อย", "พัน", "หมื่น", "แสน"];
+            n = Math.floor(n);
+            if (n === 0) return "ศูนย์";
+            if (n >= 1000000) {
+                const rest = n % 1000000;
+                return thaiIntText(Math.floor(n / 1000000)) + "ล้าน" + (rest ? thaiIntText(rest) : "");
+            }
+            const str = String(n);
+            let res = "";
+            for (let i = 0; i < str.length; i++) {
+                const digit = parseInt(str[i]);
+                const pos = str.length - 1 - i;
+                if (digit === 0) continue;
+                if (pos === 1 && digit === 1) res += "";
+                else if (pos === 1 && digit === 2) res += "ยี่";
+                else if (pos === 0 && digit === 1 && str.length > 1) res += "เอ็ด";
+                else res += thaiNumbers[digit];
+                res += thaiUnits[pos];
+            }
+            return res;
+        }
+
         function bahtText(number, currencyType) {
             if (isNaN(number) || number === "" || number == 0) return "";
-            const thaiNumbers = ["ศูนย์", "หนึ่ง", "สอง", "สาม", "สี่", "ห้า", "หก", "เจ็ด", "แปด", "เก้า"];
-            const thaiUnits = ["", "สิบ", "ร้อย", "พัน", "หมื่น", "แสน", "ล้าน"];
-            
-            let amountStr = parseInt(number).toString();
-            let res = "";
-            for (let i = 0; i < amountStr.length; i++) {
-                let digit = parseInt(amountStr[i]);
-                let pos = amountStr.length - 1 - i;
-                if (digit !== 0) {
-                    if (pos === 1 && digit === 1) res += "";
-                    else if (pos === 1 && digit === 2) res += "ยี่";
-                    else if (pos === 0 && digit === 1 && amountStr.length > 1) res += "เอ็ด";
-                    else res += thaiNumbers[digit];
-                    res += thaiUnits[pos];
-                }
+            const cents = Math.round(parseFloat(number) * 100);
+            const whole = Math.floor(cents / 100);
+            const frac = cents % 100;
+            if (currencyType === "CNY") {
+                if (frac === 0) return thaiIntText(whole) + "หยวนถ้วน";
+                const d = ["ศูนย์", "หนึ่ง", "สอง", "สาม", "สี่", "ห้า", "หก", "เจ็ด", "แปด", "เก้า"];
+                return thaiIntText(whole) + "จุด" + String(frac).padStart(2, '0').split('').map(x => d[x]).join('') + "หยวน";
             }
-            let suffix = currencyType === "CNY" ? "หยวนถ้วน" : "บาทถ้วน";
-            return res + suffix;
+            if (frac === 0) return thaiIntText(whole) + "บาทถ้วน";
+            return (whole ? thaiIntText(whole) + "บาท" : "") + thaiIntText(frac) + "สตางค์";
         }
 
         function numberToEnglish(number, currencyType) {
             if (!number || number == 0) return "";
-            return parseFloat(number).toLocaleString() + " " + currencyType + " ONLY";
+            const n = parseFloat(number);
+            const opts = Number.isInteger(n) ? {} : {minimumFractionDigits: 2, maximumFractionDigits: 2};
+            return n.toLocaleString(undefined, opts) + " " + currencyType + " ONLY";
         }
+
+        // ===== +3% bill: gross-up for 3% withholding tax =====
+        // Prices are typed as the amount actually received (net). Bill amount = net / 0.97,
+        // so that bill amount - 3% withholding = net.  e.g. 4,000 -> 4,123.71 (WHT 123.71)
+        const WHT_RATE = 3; // percent
+        function grossUpCents(netCents) {
+            const base = Math.round(netCents * 100 / (100 - WHT_RATE));
+            for (const g of [base, base + 1, base - 1]) {
+                if (g - Math.round(g * WHT_RATE / 100) === netCents) return g;
+            }
+            return base;
+        }
+        const fmtMoney = (n) => n.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
 
         // ===== Auto document number: PREFIX-YYYYMMDD + running 4 digits per day =====
         const MONTHS_EN = ["JANUARY","FEBRUARY","MARCH","APRIL","MAY","JUNE","JULY","AUGUST","SEPTEMBER","OCTOBER","NOVEMBER","DECEMBER"];
@@ -557,79 +619,76 @@
                 }
             }
 
+            const whtOn = document.getElementById('input-wht').checked;
+            const whtShow = document.getElementById('input-wht-show').checked;
+            document.getElementById('wht-options').classList.toggle('hidden', !whtOn);
+
+            // Collect line items (amounts as typed = amount actually received)
+            const items = [];
+
             // Item 1: Service
             const serviceType = document.getElementById('input-service-type').value;
             const serviceAmount = parseFloat(document.getElementById('input-service-amount').value) || 0;
-            
             if (serviceType !== 'none') {
                 const sData = serviceData[serviceType];
-                const tr = document.createElement('tr');
-                
-                let detailBox = clientInfoHtml ? `
+                const detailBox = clientInfoHtml ? `
                     <div class="mt-4 text-sm bg-gray-50 p-2 rounded w-fit border border-gray-100">
                         ${clientInfoHtml}
                     </div>
                 ` : '';
-
-                tr.innerHTML = `
-                    <td class="border border-gray-400 px-4 py-4 text-center text-gray-500 align-top">${rowNumber++}</td>
-                    <td class="border border-gray-400 px-4 py-4 align-top">
-                        <p class="font-bold text-gray-800">${sData.th_en}</p>
-                        <p class="text-sm text-gray-600 mt-1">${sData.zh}</p>
-                        ${detailBox}
-                    </td>
-                    <td class="border border-gray-400 px-4 py-4 text-right font-bold text-lg align-top">
-                        ${currencySymbol} ${serviceAmount.toLocaleString(undefined, {minimumFractionDigits: 2})}
-                    </td>
-                `;
-                tbody.appendChild(tr);
-                totalAmount += serviceAmount;
+                items.push({ title: sData.th_en, sub: sData.zh, extra: detailBox, amount: serviceAmount });
             }
 
             // Item 2: Travel
             const travelType = document.getElementById('input-travel-type').value;
             const travelAmount = parseFloat(document.getElementById('input-travel-amount').value) || 0;
-
             if (travelType !== 'none') {
                 const tData = travelData[travelType];
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td class="border border-gray-400 px-4 py-4 text-center text-gray-500 align-top">${rowNumber++}</td>
-                    <td class="border border-gray-400 px-4 py-4 align-top">
-                        <p class="font-bold text-gray-800">${tData.th_en}</p>
-                        <p class="text-sm text-gray-600 mt-1">${tData.zh}</p>
-                    </td>
-                    <td class="border border-gray-400 px-4 py-4 text-right font-bold text-lg align-top">
-                        ${currencySymbol} ${travelAmount.toLocaleString(undefined, {minimumFractionDigits: 2})}
-                    </td>
-                `;
-                tbody.appendChild(tr);
-                totalAmount += travelAmount;
+                items.push({ title: tData.th_en, sub: tData.zh, extra: '', amount: travelAmount });
             }
 
             // Item 3: Others
             const otherDescTh = document.getElementById('input-other-desc-th').value;
             const otherDescEn = document.getElementById('input-other-desc-en').value;
             const otherAmount = parseFloat(document.getElementById('input-other-amount').value) || 0;
-
             if (otherDescTh !== '' || otherDescEn !== '') {
-                const tr = document.createElement('tr');
                 const combinedDesc = [otherDescTh, otherDescEn].filter(Boolean).join(' (');
                 const finalDesc = otherDescEn ? combinedDesc + ')' : combinedDesc;
+                items.push({ title: esc(finalDesc), sub: '其他服务 (Other Services)', extra: '', amount: otherAmount });
+            }
 
+            // Amounts in satang/fen to avoid rounding drift
+            const netCents = items.map(it => Math.round(it.amount * 100));
+            const netTotalCents = netCents.reduce((a, b) => a + b, 0);
+            let showCents = netCents.slice();
+            let billTotalCents = netTotalCents;
+            if (whtOn && netTotalCents > 0) {
+                billTotalCents = grossUpCents(netTotalCents);
+                showCents = netCents.map(c => Math.round(c * 100 / (100 - WHT_RATE)));
+                // put any rounding difference on the last priced line so lines add up to the total
+                const diff = billTotalCents - showCents.reduce((a, b) => a + b, 0);
+                for (let i = showCents.length - 1; i >= 0; i--) {
+                    if (netCents[i] !== 0) { showCents[i] += diff; break; }
+                }
+            }
+            const whtCents = billTotalCents - netTotalCents;
+
+            items.forEach((it, i) => {
+                const tr = document.createElement('tr');
                 tr.innerHTML = `
                     <td class="border border-gray-400 px-4 py-4 text-center text-gray-500 align-top">${rowNumber++}</td>
                     <td class="border border-gray-400 px-4 py-4 align-top">
-                        <p class="font-bold text-gray-800">${finalDesc}</p>
-                        <p class="text-sm text-gray-600 mt-1">其他服务 (Other Services)</p>
+                        <p class="font-bold text-gray-800">${it.title}</p>
+                        <p class="text-sm text-gray-600 mt-1">${it.sub}</p>
+                        ${it.extra}
                     </td>
                     <td class="border border-gray-400 px-4 py-4 text-right font-bold text-lg align-top">
-                        ${currencySymbol} ${otherAmount.toLocaleString(undefined, {minimumFractionDigits: 2})}
+                        ${currencySymbol} ${fmtMoney(showCents[i] / 100)}
                     </td>
                 `;
                 tbody.appendChild(tr);
-                totalAmount += otherAmount;
-            }
+            });
+            totalAmount = billTotalCents / 100;
 
             // Fallback if no items selected to keep layout intact
             if (tbody.children.length === 0) {
@@ -643,7 +702,16 @@
             }
 
             // 6. Update Totals
-            document.getElementById('view-amount-total').innerText = currencySymbol + " " + totalAmount.toLocaleString(undefined, {minimumFractionDigits: 2});
+            document.getElementById('view-amount-total').innerText = currencySymbol + " " + fmtMoney(totalAmount);
+
+            // +3% bill: withholding tax rows + hint in the form
+            const whtActive = whtOn && netTotalCents > 0;
+            document.getElementById('wht-rows').classList.toggle('hidden', !(whtActive && whtShow));
+            document.getElementById('view-wht-amount').innerText = '- ' + currencySymbol + ' ' + fmtMoney(whtCents / 100);
+            document.getElementById('view-net-amount').innerText = currencySymbol + ' ' + fmtMoney(netTotalCents / 100);
+            document.getElementById('wht-hint').innerText = whtActive
+                ? `รับจริง 实付 ${fmtMoney(netTotalCents / 100)} → ออกบิล 开票 ${fmtMoney(billTotalCents / 100)} (หัก 3% = ${fmtMoney(whtCents / 100)})`
+                : 'ใส่ราคาก่อน แล้วยอดออกบิลจะขึ้นตรงนี้';
             document.getElementById('view-total-words').innerText = bahtText(totalAmount, currencyType);
             document.getElementById('view-en-words').innerText = numberToEnglish(totalAmount, currencyType);
         }
@@ -653,8 +721,10 @@
             'input-company-name', 'input-company-address', 'input-tax-id', // New inputs added to listener
             'input-service-type', 'input-service-amount',
             'input-travel-type', 'input-travel-amount',
-            'input-other-desc-th', 'input-other-desc-en', 'input-other-amount'
+            'input-other-desc-th', 'input-other-desc-en', 'input-other-amount',
+            'input-wht', 'input-wht-show'
         ];
+        ['input-wht', 'input-wht-show'].forEach(id => document.getElementById(id).addEventListener('change', updateBill));
 
         document.getElementById('input-doc-type').addEventListener('change', generateDocNo);
         document.getElementById('input-date').addEventListener('change', generateDocNo);
@@ -681,7 +751,7 @@
             generateDocNo();
 
             // Prefill from the /today board: ?d=<base64url JSON>
-            //   { customers: [{en, cn, pp}], amount, service: 'service_2', currency: 'THB', docType: 'cash_sale' }
+            //   { customers: [{en, cn, pp}], amount, service: 'service_2', currency: 'THB', docType: 'cash_sale', wht: true }
             try {
                 const raw = new URLSearchParams(location.search).get('d');
                 if (raw) {
@@ -702,6 +772,7 @@
                     }
                     if (d.service) document.getElementById('input-service-type').value = d.service;
                     if (d.amount) document.getElementById('input-service-amount').value = d.amount;
+                    if (d.wht) document.getElementById('input-wht').checked = true;
                     generateDocNo();
                 }
             } catch (e) { console.warn('prefill failed', e); }
